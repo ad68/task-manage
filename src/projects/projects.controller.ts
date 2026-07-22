@@ -1,17 +1,26 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Put, HttpStatus, Res } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Put, HttpStatus, Res, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import ProjectStatusEnum from './enum/projectStatusEnum';
 import type { Response } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { extname } from 'path';
+import { diskStorage } from 'multer';
 
 @Controller('projects')
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) { }
 
+
   @Post()
-  create(@Body() createProjectDto: CreateProjectDto) {
-    return this.projectsService.create(createProjectDto);
+  async create(@Body() createProjectDto: CreateProjectDto, @Res() res: Response) {
+    const createProject = await this.projectsService.create(createProjectDto);
+    return res.status(HttpStatus.CREATED).json({
+      status: HttpStatus.OK,
+      data: createProject,
+      message: "project created"
+    })
   }
 
   @Get()
@@ -30,17 +39,57 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.projectsService.findOne(+id);
+  async findOne(@Param('id') id: string, @Res() res: Response) {
+    const project = await this.projectsService.findOne(+id);
+    return res.status(HttpStatus.OK).json({
+      status: HttpStatus.OK,
+      data: project,
+      message: "project found"
+    })
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() updateProjectDto: UpdateProjectDto) {
-    return this.projectsService.update(+id, updateProjectDto);
+  async update(@Param('id') id: string, @Body() updateProjectDto: UpdateProjectDto, @Res() res: Response) {
+    await this.projectsService.update(+id, updateProjectDto);
+    return res.status(HttpStatus.OK).json({
+      status: HttpStatus.OK,
+      data: null,
+      message: "project updated"
+    })
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.projectsService.remove(+id);
+  async remove(@Param('id') id: string, @Res() res: Response) {
+    await this.projectsService.remove(+id);
+    return res.status(HttpStatus.OK).json({
+      status: HttpStatus.OK,
+      data: null,
+      message: "project deleted successful"
+    })
+  }
+  @Post('upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: 'E:/uploads',
+        filename: (req, file, callback) => {
+          const uniqueName =
+            Date.now() +
+            '-' +
+            Math.round(Math.random() * 1e9) +
+            extname(file.originalname);
+          callback(null, uniqueName);
+        },
+      }),
+    }),
+  )
+  upload(@UploadedFile() file: Express.Multer.File) {
+    return {
+      success: true,
+      filename: file.filename,
+      originalName: file.originalname,
+      path: file.path,
+      size: file.size,
+    };
   }
 }
